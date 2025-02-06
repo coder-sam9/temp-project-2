@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import MoviesList from "./components/MoviesList";
 import "./App.css";
 
@@ -8,9 +8,8 @@ function App() {
   const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchMovies = async () => {
+  const fetchMovies = useCallback(async () => {
     setError(null);
-    setMovies([]);
     setIsLoading(true);
     setIsRetrying(false);
 
@@ -20,13 +19,14 @@ function App() {
         throw new Error(`Something went wrong`);
       }
       const data = await response.json();
-      const movieList = data.results.slice(0, 10).map((item) => ({
-        key: item.title + item.release_date,
-        title: item.title,
-        releaseDate: item.release_date,
-        openingText: item.opening_text,
-      }));
-      setMovies(movieList);
+      setMovies(
+        data.results.slice(0, 10).map((item) => ({
+          key: item.title + item.release_date,
+          title: item.title,
+          releaseDate: item.release_date,
+          openingText: item.opening_text,
+        }))
+      );
     } catch (err) {
       console.error("Fetch error:", err);
       setError(err.message);
@@ -34,32 +34,34 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchMovies();
+  }, [fetchMovies]);
 
   useEffect(() => {
     if (isRetrying) {
-      const retryDelay = 5000; 
-      const retryTimer = setTimeout(() => {
-        fetchMovies();
-      }, retryDelay);
-
+      const retryDelay = 5000;
+      const retryTimer = setTimeout(fetchMovies, retryDelay);
       return () => clearTimeout(retryTimer);
     }
-  }, [isRetrying]);
+  }, [isRetrying, fetchMovies]);
+
+  const memoizedMovies = useMemo(() => movies, [movies]);
 
   let content = <p>No Movies Found</p>;
-  if (isLoading) {
-    content = <p>Loading...</p>;
-  }
+  if (isLoading) content = <p>Loading...</p>;
   if (error) {
     content = (
       <p>
-        Something went wrong...{isRetrying && <span style={{ fontWeight: "bold" }}> Retrying</span>}
+        Something went wrong...
+        {isRetrying && <span style={{ fontWeight: "bold" }}> Retrying</span>}
       </p>
     );
   }
   if (!isLoading && !error && movies.length > 0) {
-    content = <MoviesList movies={movies} />;
+    content = <MoviesList movies={memoizedMovies} />;
   }
 
   return (
