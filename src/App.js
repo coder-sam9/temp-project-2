@@ -1,82 +1,81 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import MoviesList from "./components/MoviesList";
-import "./App.css";
-import AddMovies from "./components/AddMovies";
+import React, { useState, useEffect, useCallback } from 'react';
+
+import MoviesList from './components/MoviesList';
+import AddMovies from './components/AddMovies';
+import './App.css';
 
 function App() {
   const [movies, setMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchMovies = useCallback(async () => {
-    setError(null);
+  const fetchMoviesHandler = useCallback(async () => {
     setIsLoading(true);
-    setIsRetrying(false);
-
+    setError(null);
     try {
-      const response = await fetch("https://swapi.dev/api/films/");
+      const response = await fetch('https://temp-project-2-38d8c-default-rtdb.firebaseio.com/movies.json');
       if (!response.ok) {
-        throw new Error(`Something went wrong`);
+        throw new Error('Something went wrong!');
       }
+
       const data = await response.json();
-      setMovies(
-        data.results.slice(0, 10).map((item) => ({
-          key: item.title + item.release_date,
-          title: item.title,
-          releaseDate: item.release_date,
-          openingText: item.opening_text,
-        }))
-      );
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError(err.message);
-      setIsRetrying(true);
-    } finally {
-      setIsLoading(false);
+
+      let transformedMovies=[];
+      for (const key in data) {
+        transformedMovies.push({
+          id:key,
+          title:data[key].title,
+          openingText:data[key].openingText,
+          releaseDate:data[key].releaseDate,
+          
+        })
+      }
+      setMovies(transformedMovies);
+    } catch (error) {
+      setError(error.message);
     }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchMovies();
-  }, [fetchMovies]);
+    fetchMoviesHandler();
+  }, [fetchMoviesHandler]);
 
-  useEffect(() => {
-    if (isRetrying) {
-      const retryDelay = 5000;
-      const retryTimer = setTimeout(fetchMovies, retryDelay);
-      return () => clearTimeout(retryTimer);
-    }
-  }, [isRetrying, fetchMovies]);
-
-  const memoizedMovies = useMemo(() => movies, [movies]);
-
-  let content = <p>No Movies Found</p>;
-  if (isLoading) content = <p>Loading...</p>;
-  if (error) {
-    content = (
-      <p>
-        Something went wrong...
-        {isRetrying && <span style={{ fontWeight: "bold" }}> Retrying</span>}
-      </p>
-    );
+  async function addMovieHandler(movie) {
+    const resposne=await fetch('https://temp-project-2-38d8c-default-rtdb.firebaseio.com/movies.json',
+      {
+        method:'POST',
+        body:JSON.stringify(movie),
+        headers:{
+          'Content-type':'application/json'
+        }
+      }
+    )
+    console.log(resposne);
+    fetchMoviesHandler()
   }
-  if (!isLoading && !error && movies.length > 0) {
-    content = <MoviesList movies={memoizedMovies} />;
+
+  let content = <p>Found no movies.</p>;
+
+  if (movies.length > 0) {
+    content = <MoviesList movies={movies} afterDelete={()=>fetchMoviesHandler()} />;
+  }
+
+  if (error) {
+    content = <p>{error}</p>;
+  }
+
+  if (isLoading) {
+    content = <p>Loading...</p>;
   }
 
   return (
     <React.Fragment>
       <section>
-
-      <AddMovies/>
+        <AddMovies onAddMovie={addMovieHandler} />
       </section>
       <section>
-        {isRetrying ? (
-          <button onClick={() => setIsRetrying(false)}>Cancel Retry</button>
-        ) : (
-          <button onClick={fetchMovies}>Fetch Movies</button>
-        )}
+        <button onClick={fetchMoviesHandler}>Fetch Movies</button>
       </section>
       <section>{content}</section>
     </React.Fragment>
